@@ -14,6 +14,11 @@ const VOID = 0
 const BLACK = 1
 const WHITE = 2
 
+// BLACKならWHITE, WHITEならBLACKを返す
+func getEnemy(turn int) int {
+	return BLACK + WHITE - turn
+}
+
 type Field struct {
 	blocks [FieldWidth][FieldHeight]int
 }
@@ -60,6 +65,16 @@ func (field *Field) put(turn int, x, y int) error {
 	return nil
 }
 
+func (field *Field) turnover(turn int, x, y int) error {
+	enemy := getEnemy(turn)
+	if field.get(x, y) != enemy {
+		return errors.New("相手の石がありません")
+	}
+
+	field.blocks[x][y] = turn
+	return nil
+}
+
 func (field *Field) get(x, y int) int {
 	if !field.isValidPosition(x, y) {
 		return OUT
@@ -85,6 +100,89 @@ func (field *Field) isValidPosition(x, y int) bool {
 	return x >= 0 && x < FieldWidth && y >= 0 && y < FieldHeight
 }
 
+// その位置に石を置いてひっくり返せるかどうかを返す
+func (field *Field) canTurnover(turn int, x, y int) bool {
+	return len(field.getTurnoverBlocks(turn, x, y)) >= 1
+}
+
+// 石を置いてひっくり返す
+func (field *Field) doTurnover(turn int, x, y int) (result [][]int, err error) {
+	result = field.getTurnoverBlocks(turn, x, y)
+	if len(result) == 0 {
+		err = errors.New("ひっくり返せませんでした")
+		return
+	}
+
+	for _, pos := range result {
+		x, y := pos[0], pos[1]
+		field.turnover(turn, x, y)
+	}
+	return
+}
+
+// ひっくり返せるマス目を全部取得する
+func (field *Field) getTurnoverBlocks(turn int, x, y int) (result [][]int) {
+	if !field.isVoid(x, y) {
+		return
+	}
+
+	// 全方向に対して、ひっくり返せるマス目を取得
+	for ix := -1; ix <= 1; ix++ {
+		for iy := -1; iy <= 1; iy++ {
+			if ix != 0 || iy != 0 {
+				result = append(result, field.getTurnoverBlocksInLine(turn, x, y, ix, iy)...)
+			}
+		}
+	}
+	return
+}
+
+func (field *Field) getTurnoverBlocksInLine(turn int, x, y, ix, iy int) (result [][]int) {
+	if !field.isVoid(x, y) {
+		return
+	}
+
+	enemy := getEnemy(turn)
+
+	cx, cy := x+ix, y+iy // 判定中のマス目
+
+	// 隣が相手のマスでなければ、ひっくり返せない
+	if field.get(cx, cy) != enemy {
+		return
+	}
+
+	for {
+		result = append(result, []int{cx, cy})
+		cx += ix
+		cy += iy
+
+		switch field.get(cx, cy) {
+		case OUT, VOID:
+			return [][]int{} // 結果挟めなかったので、空配列を返す
+		case turn:
+			return result // 挟めたので返す
+		case enemy:
+			// do nothing
+		}
+	}
+}
+
+// 手番として石を置けるかどうか
+func (field *Field) canPlace(turn int, x, y int) bool {
+	return field.isVoid(x, y) && field.canTurnover(turn, x, y)
+}
+
+// 手番として石を置く
+func (field *Field) doPlace(turn int, x, y int) error {
+	if !field.canPlace(turn, x, y) {
+		return errors.New("石を置けません")
+	}
+
+	field.doTurnover(turn, x, y)
+	field.put(turn, x, y)
+	return nil
+}
+
 func main() {
 	var field Field
 	field.reset()
@@ -99,7 +197,7 @@ func main() {
 		}
 
 		fmt.Printf("%d, %d におきます\n", x+1, y+1)
-		field.put(turn, x, y)
+		field.doPlace(turn, x, y)
 		field.print()
 
 		turn = BLACK + WHITE - turn
@@ -112,7 +210,11 @@ func fetchCommandFromInput(field *Field, turn int) (x int, y int, err error) {
 		x, y, err = fetchFromInput(turn)
 		switch field.get(x, y) {
 		case VOID:
-			return
+			if field.canPlace(turn, x, y) {
+				return
+			} else {
+				fmt.Println("相手の石をひっくり返せません")
+			}
 		case BLACK, WHITE:
 			fmt.Println("すでに石が置かれています")
 		case OUT:
