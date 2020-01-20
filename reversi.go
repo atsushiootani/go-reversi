@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -30,9 +31,9 @@ func (field *Field) reset() {
 }
 
 func (field *Field) print() {
-	for x := 0; x < FieldWidth; x++ {
+	for y := 0; y < FieldHeight; y++ {
 		fmt.Println(strings.Repeat("-", FieldWidth*4+1))
-		for y := 0; y < FieldHeight; y++ {
+		for x := 0; x < FieldWidth; x++ {
 			fmt.Print("|")
 			mark := "   "
 			if field.blocks[x][y] == BLACK {
@@ -48,7 +49,18 @@ func (field *Field) print() {
 	fmt.Println(strings.Repeat("-", FieldWidth*4+1))
 }
 
-func (field *Field) getBlock(x, y int) int {
+func (field *Field) put(turn int, x, y int) error {
+	if !field.isValidPosition(x, y) {
+		return errors.New("指定の座標は盤外です")
+	}
+	if !field.isVoid(x, y) {
+		return errors.New("すでに石が置かれています")
+	}
+	field.blocks[x][y] = turn
+	return nil
+}
+
+func (field *Field) get(x, y int) int {
 	if !field.isValidPosition(x, y) {
 		return OUT
 	}
@@ -57,15 +69,15 @@ func (field *Field) getBlock(x, y int) int {
 
 // x, yの位置が空いているかどうか
 func (field *Field) isVoid(x, y int) bool {
-	return field.getBlock(x, y) == VOID
+	return field.get(x, y) == VOID
 }
 
 func (field *Field) isBlack(x, y int) bool {
-	return field.getBlock(x, y) == BLACK
+	return field.get(x, y) == BLACK
 }
 
 func (field *Field) isWhite(x, y int) bool {
-	return field.getBlock(x, y) == WHITE
+	return field.get(x, y) == WHITE
 }
 
 // x, yが有効な座標か
@@ -78,19 +90,27 @@ func main() {
 	field.reset()
 	field.print()
 
-	x, y, err := fetchCommandFromInput(&field)
-	if err != nil {
-		fmt.Println("残念！エラーです")
-	} else {
+	turn := BLACK
+	for {
+		x, y, err := fetchCommandFromInput(&field, turn)
+		if err != nil {
+			fmt.Println("残念！エラーです")
+			continue
+		}
+
 		fmt.Printf("%d, %d におきます\n", x+1, y+1)
+		field.put(turn, x, y)
+		field.print()
+
+		turn = BLACK + WHITE - turn
 	}
 }
 
 // 入力からコマンドを取得する
-func fetchCommandFromInput(field *Field) (x int, y int, err error) {
+func fetchCommandFromInput(field *Field, turn int) (x int, y int, err error) {
 	for {
-		x, y, err = fetchFromInput()
-		switch field.getBlock(x, y) {
+		x, y, err = fetchFromInput(turn)
+		switch field.get(x, y) {
 		case VOID:
 			return
 		case BLACK, WHITE:
@@ -101,8 +121,13 @@ func fetchCommandFromInput(field *Field) (x int, y int, err error) {
 	}
 }
 
-func fetchFromInput() (x int, y int, err error) {
-	fmt.Print("コマンドを入力してください(ex. `1 1`): ")
+func fetchFromInput(turn int) (x int, y int, err error) {
+	player := "黒"
+	if turn == WHITE {
+		player = "白"
+	}
+
+	fmt.Printf("%sの手盤です。コマンドを入力してください(ex. `1 1`): ", player)
 	fmt.Scan(&x)
 	fmt.Scan(&y)
 
