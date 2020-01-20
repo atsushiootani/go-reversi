@@ -19,12 +19,12 @@ func main() {
 	fields[4][4] = BLACK
 	fields[3][4] = WHITE
 	fields[4][3] = WHITE
- 	printFields(fields)
+	printFields(fields)
 }
 
 func printFields(fields [FieldWidth][FieldHeight]int) {
 	for x := 0; x < FieldWidth; x++ {
-		fmt.Println(strings.Repeat("-", FieldWidth * 4 + 1))
+		fmt.Println(strings.Repeat("-", FieldWidth*4+1))
 		for y := 0; y < FieldHeight; y++ {
 			fmt.Print("|")
 			mark := "   "
@@ -38,5 +38,5 @@ func printFields(fields [FieldWidth][FieldHeight]int) {
 		}
 		fmt.Println("|")
 	}
-	fmt.Println(strings.Repeat("-", FieldWidth * 4 + 1))
+	fmt.Println(strings.Repeat("-", FieldWidth*4+1))
 }
